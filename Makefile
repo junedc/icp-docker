@@ -13,6 +13,12 @@ REDIS=redis
 MEILI=meilisearch
 MAILHOG=mailhog
 
+# Frontend service names
+ADMIN_UI=admin-ui
+ADMIN_UI_MASTER=admin-ui-master
+ORDER_DEV=ordering-portal-develop
+ORDER_MASTER=ordering-portal-master
+
 # -------------------------
 # Basic Docker controls
 # -------------------------
@@ -41,7 +47,7 @@ logs-api:
 	$(DC) logs -f $(API_APP) $(API_NGINX)
 
 logs-front:
-	$(DC) logs -f admin-ui ordering-portal-develop ordering-portal-master
+	$(DC) logs -f $(ADMIN_UI) $(ADMIN_UI_MASTER) $(ORDER_DEV) $(ORDER_MASTER)
 
 logs-db:
 	$(DC) logs -f $(MYSQL) $(REDIS) $(MEILI) $(MAILHOG)
@@ -53,13 +59,16 @@ bash-api:
 	$(DC) exec $(API_APP) sh
 
 bash-admin:
-	$(DC) exec admin-ui sh
+	$(DC) exec $(ADMIN_UI) sh
+
+bash-admin-master:
+	$(DC) exec $(ADMIN_UI_MASTER) sh
 
 bash-order-dev:
-	$(DC) exec ordering-portal-develop sh
+	$(DC) exec $(ORDER_DEV) sh
 
 bash-order-master:
-	$(DC) exec ordering-portal-master sh
+	$(DC) exec $(ORDER_MASTER) sh
 
 bash-mysql:
 	$(DC) exec $(MYSQL) sh
@@ -127,13 +136,16 @@ npm-install-api:
 # Frontend helpers
 # -------------------------
 npm-admin:
-	$(DC) exec admin-ui sh
+	$(DC) exec $(ADMIN_UI) sh
+
+npm-admin-master:
+	$(DC) exec $(ADMIN_UI_MASTER) sh
 
 npm-order-dev:
-	$(DC) exec ordering-portal-develop sh
+	$(DC) exec $(ORDER_DEV) sh
 
 npm-order-master:
-	$(DC) exec ordering-portal-master sh
+	$(DC) exec $(ORDER_MASTER) sh
 
 # -------------------------
 # Database / service checks
@@ -167,7 +179,10 @@ rebuild-api:
 	$(DC) up -d --build $(API_APP) $(API_NGINX)
 
 rebuild-front:
-	$(DC) up -d --build admin-ui ordering-portal-develop ordering-portal-master
+	$(DC) up -d --build $(ADMIN_UI) $(ADMIN_UI_MASTER) $(ORDER_DEV) $(ORDER_MASTER)
+
+rebuild-admin-master:
+	$(DC) up -d --build $(ADMIN_UI_MASTER)
 
 # -------------------------
 # First-time setup (Laravel)
@@ -183,18 +198,20 @@ setup-laravel:
 # -------------------------
 help:
 	@echo "Available commands:"
-	@echo "  make up                - Start containers"
-	@echo "  make build             - Build and start containers"
-	@echo "  make down              - Stop and remove containers"
-	@echo "  make logs              - Tail all logs"
-	@echo "  make logs-api          - Tail Laravel/Nginx logs"
-	@echo "  make logs-front        - Tail frontend logs"
-	@echo "  make bash-api          - Shell into Laravel PHP container"
-	@echo "  make composer-install  - Run composer install in Laravel"
-	@echo "  make artisan           - Run php artisan (generic)"
-	@echo "  make migrate          - Run migrations"
-	@echo "  make optimize-clear    - Clear Laravel caches"
-	@echo "  make redis-ping        - Ping Redis"
-	@echo "  make meili-health      - Check Meilisearch health"
-	@echo "  make xdebug-check      - Verify Xdebug is loaded"
+	@echo "  make up                   - Start containers"
+	@echo "  make build                - Build and start containers"
+	@echo "  make down                 - Stop and remove containers"
+	@echo "  make logs                 - Tail all logs"
+	@echo "  make logs-api             - Tail Laravel/Nginx logs"
+	@echo "  make logs-front           - Tail frontend logs (incl admin-ui-master)"
+	@echo "  make bash-api             - Shell into Laravel PHP container"
+	@echo "  make bash-admin           - Shell into admin-ui"
+	@echo "  make bash-admin-master    - Shell into admin-ui-master"
+	@echo "  make composer-install     - Run composer install in Laravel"
+	@echo "  make artisan              - Run php artisan"
+	@echo "  make migrate              - Run migrations"
+	@echo "  make optimize-clear       - Clear Laravel caches"
+	@echo "  make redis-ping           - Ping Redis"
+	@echo "  make meili-health         - Check Meilisearch health"
+	@echo "  make xdebug-check         - Verify Xdebug is loaded"
 	@echo "  make scout-import MODEL='App\\Models\\Product'"

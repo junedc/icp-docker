@@ -1,11 +1,13 @@
 services:
+  # =========================
+  # Laravel: starline-api
+  # =========================
   starline-api-app:
     build:
       context: .
       dockerfile: docker/laravel/Dockerfile
     container_name: starline-api-app
     working_dir: /var/www/html
-    ports: ["9003:9003"]
     volumes:
       - ../starline-api:/var/www/html
       - ./docker/laravel/php.ini:/usr/local/etc/php/conf.d/custom.ini
@@ -24,6 +26,63 @@ services:
     depends_on: [starline-api-app]
     networks: [starline-net]
 
+  # =========================
+  # Laravel: transforma
+  # =========================
+  transforma-app:
+    build:
+      context: .
+      dockerfile: docker/laravel/Dockerfile
+    container_name: transforma-app
+    working_dir: /var/www/html
+    volumes:
+      - ../transforma:/var/www/html
+      - ./docker/laravel/php.ini:/usr/local/etc/php/conf.d/custom.ini
+      - ./docker/laravel/xdebug.ini:/usr/local/etc/php/conf.d/docker-php-ext-xdebug.ini
+    depends_on: [mysql, redis, meilisearch, mailhog]
+    extra_hosts: ["host.docker.internal:host-gateway"]
+    networks: [starline-net]
+
+  transforma-nginx:
+    image: nginx:alpine
+    container_name: transforma-nginx
+    ports: ["${TRANSFORMA_HTTP_PORT:-8001}:80"]
+    volumes:
+      - ../transforma:/var/www/html
+      - ./docker/nginx/transforma.conf:/etc/nginx/conf.d/default.conf
+    depends_on: [transforma-app]
+    networks: [starline-net]
+
+  # =========================
+  # Laravel: starline-api-master
+  # =========================
+  starline-api-master-app:
+    build:
+      context: .
+      dockerfile: docker/laravel/Dockerfile
+    container_name: starline-api-master-app
+    working_dir: /var/www/html
+    volumes:
+      - ../starline-api-master:/var/www/html
+      - ./docker/laravel/php.ini:/usr/local/etc/php/conf.d/custom.ini
+      - ./docker/laravel/xdebug.ini:/usr/local/etc/php/conf.d/docker-php-ext-xdebug.ini
+    depends_on: [mysql, redis, meilisearch, mailhog]
+    extra_hosts: ["host.docker.internal:host-gateway"]
+    networks: [starline-net]
+
+  starline-api-master-nginx:
+    image: nginx:alpine
+    container_name: starline-api-master-nginx
+    ports: ["${STARLINE_API_MASTER_HTTP_PORT:-8002}:80"]
+    volumes:
+      - ../starline-api-master:/var/www/html
+      - ./docker/nginx/starline-api-master.conf:/etc/nginx/conf.d/default.conf
+    depends_on: [starline-api-master-app]
+    networks: [starline-net]
+
+  # =========================
+  # MySQL / Redis / Meili / Mailhog / phpMyAdmin
+  # =========================
   mysql:
     image: mysql:8.0
     container_name: starline-mysql
@@ -79,6 +138,9 @@ services:
     ports: ["${PHPMYADMIN_PORT:-8082}:80"]
     networks: [starline-net]
 
+  # =========================
+  # Frontends
+  # =========================
   admin-ui:
     image: node:22-alpine
     container_name: admin-ui
@@ -91,6 +153,21 @@ services:
     command: sh -c "npm install && npm run dev -- --host 0.0.0.0 --port 5173"
     networks: [starline-net]
 
+  admin-ui-master:
+    image: node:22-alpine
+    container_name: admin-ui-master
+    working_dir: /app
+    ports:
+      - "${ADMIN_UI_MASTER_PORT:-5176}:5176"
+    volumes:
+      - ../admin-ui-master:/app
+      - admin_ui_master_node_modules:/app/node_modules
+    environment:
+      CHOKIDAR_USEPOLLING: "true"
+    command: sh -c "npm install && npm run dev -- --host 0.0.0.0 --port 5176"
+    networks:
+      - starline-net
+
   ordering-portal-develop:
     image: node:22-alpine
     container_name: ordering-portal-develop
@@ -99,11 +176,10 @@ services:
     volumes:
       - ../ordering-portal-develop:/app
       - ordering_dev_node_modules:/app/node_modules
-      - ordering_dev_pnpm_store:/pnpm/store  
+      - ordering_dev_pnpm_store:/pnpm/store
     environment:
       CHOKIDAR_USEPOLLING: "true"
       PNPM_HOME: /pnpm
-    #command: sh -c "corepack enable && pnpm config set store-dir /pnpm/store && pnpm install && pnpm run dev --host 0.0.0.0 --port 5174"
     command: sh -lc "corepack enable && pnpm config set userconfig /app/.npmrc && pnpm config set store-dir /pnpm/store && pnpm install && pnpm run dev --host 0.0.0.0 --port 5174"
     networks: [starline-net]
 
@@ -128,8 +204,11 @@ services:
       - ./docker/router/nginx.conf:/etc/nginx/conf.d/default.conf:ro
     depends_on:
       - admin-ui
+      - admin-ui-master
       - ordering-portal-develop
       - ordering-portal-master
+      - starline-api-nginx
+      - transforma-nginx
     networks:
       - starline-net
 
@@ -138,6 +217,7 @@ volumes:
   redis_data:
   meili_data:
   admin_ui_node_modules:
+  admin_ui_master_node_modules:
   ordering_dev_node_modules:
   ordering_dev_pnpm_store:
   ordering_master_node_modules:
